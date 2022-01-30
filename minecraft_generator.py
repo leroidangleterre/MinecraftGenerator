@@ -44,18 +44,19 @@ def clone_cubes():
             
             unselect_everything()
 
-            z = 0.5 + random.randint(0, 3)
+            max_z = 0.5 + random.randint(1, 4)
             
-            # Clone the original cube
-            bpy.context.view_layer.objects.active = original_cube
-            bpy.data.objects[original_cube.name].select_set(True)
-            bpy.ops.object.duplicate(linked=True)
-            clone = bpy.context.view_layer.objects.active
-            clone.location = (x, y, z)
-            # Move clone to the clones collection:
-            clones_collection.objects.link(clone)
-            original_collection.objects.unlink(clone)
+            for z in range(0, int(max_z)):
+                # Clone the original cube
+                bpy.context.view_layer.objects.active = original_cube
+                bpy.data.objects[original_cube.name].select_set(True)
+                bpy.ops.object.duplicate(linked=True)
+                clone = bpy.context.view_layer.objects.active
+                clone.location = (x, y, z)
+                # Move clone to the clones collection:
+                clones_collection.objects.link(clone)
+                original_collection.objects.unlink(clone)
     print("Cloning done.")
 
-#remove_clones()
+remove_clones()
 clone_cubes()
