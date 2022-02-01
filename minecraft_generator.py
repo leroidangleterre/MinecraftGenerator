@@ -2,10 +2,12 @@
 
 
 import bpy
+import bmesh
+import math
 import random
 
 
-world_width = 10
+world_width = 20
 world_length = 10
 
 scene = bpy.context.scene
@@ -14,49 +16,88 @@ random.seed()
 
 
 original_collection = scene.collection.children.get("Original_cubes")
-print("coll_target: " + str(original_collection))
 
 clones_collection = scene.collection.children.get("Clones")
-print("clones_collection: " + str(clones_collection))
 
 def remove_clones():
-    print("Selecting for deletion")
+    unselect_everything()
     for object in bpy.data.collections["Clones"].objects:
         bpy.data.objects[object.name].select_set(True)
-    print("Selecting for deletion done. Deleting...")
     bpy.ops.object.delete()
     print("Deletion done.")
      
 
 def unselect_everything():
     bpy.ops.object.select_all(action='DESELECT')
-    #    for object in scene.objects:
-    #        bpy.data.objects[object.name].select_set(False)
+    
+
+def get_vertices_avg_x(object):
+    sumX = 0
+    nb_vertices = 0
+    for vertex in object.data.vertices:
+        sumX = sumX + vertex.co.x
+        nb_vertices = nb_vertices + 1
+    return sumX / nb_vertices
+
+def get_vertices_avg_y(object):
+    sumY = 0
+    nb_vertices = 0
+    for vertex in object.data.vertices:
+        sumY = sumY + vertex.co.y
+        nb_vertices = nb_vertices + 1
+    return sumY / nb_vertices
+
+def create_clones_batch():
+    bpy.context.view_layer.objects.active = original_cube
+    bpy.data.objects[original_cube.name].select_set(True)
+    
+    print("First modifier")
+    # First modifier: array along X
+    bpy.ops.object.modifier_add(type='ARRAY')
+    original_cube.modifiers["Array"].count = world_width
+    bpy.ops.object.modifier_apply(modifier="Array")
+    
+    print("Second modifier")
+    # Second modifier: array along Y
+    bpy.ops.object.modifier_add(type='ARRAY')
+    original_cube.modifiers["Array"].count = world_length
+    original_cube.modifiers["Array"].relative_offset_displace[0] = 0
+    original_cube.modifiers["Array"].relative_offset_displace[1] = 1
+    bpy.ops.object.modifier_apply(modifier="Array")
+
+    # Place the clones in the Clones collection
+    clones_collection.objects.link(original_cube)
+    original_collection.objects.unlink(original_cube)
+    # Separate individual clones
+    original_cube.select_set(True)
+    bpy.ops.mesh.separate(type='LOOSE')
+    # Move original cube back to Original_cubes collection
+    original_collection.objects.link(original_cube)    
+    clones_collection.objects.unlink(original_cube)    
+
+    print("Cubes for altitude")        
+    # Creating cube stacks to match the altitude
+    for object in bpy.data.collections["Clones"].objects:
+        bpy.context.view_layer.objects.active = object
+        bpy.ops.object.modifier_add(type='ARRAY')
+        
+        # Extract coordinates from vertices
+        x = get_vertices_avg_x(object)
+        y = get_vertices_avg_y(object)
+        object.modifiers["Array"].count = perlin_generator.get_value(x, y)
+        object.modifiers["Array"].relative_offset_displace[0] = 0
+        object.modifiers["Array"].relative_offset_displace[2] = 1
+    print("Done.")
+
+class PerlinGenerator:
+    grid_size = 10
+    
+    def get_value(self, x, y):
+        # default value for testing purposes:
+        return (int(x)%4) + (int(y)%3)
         
 
-def clone_cubes():
-    print("Cloning cubes...")
-    nb_steps = 10    
-    
-    for x in range(int(-world_width/2), int(world_width/2+1)):
-        print("   Cloning row " + str(x))
-        for y in range(int(-world_length/2), int(world_length/2+1)):
-            
-            unselect_everything()
-
-            max_z = 0.5 + random.randint(1, 4)
-            
-            for z in range(0, int(max_z)):
-                # Clone the original cube
-                bpy.context.view_layer.objects.active = original_cube
-                bpy.data.objects[original_cube.name].select_set(True)
-                bpy.ops.object.duplicate(linked=True)
-                clone = bpy.context.view_layer.objects.active
-                clone.location = (x, y, z)
-                # Move clone to the clones collection:
-                clones_collection.objects.link(clone)
-                original_collection.objects.unlink(clone)
-    print("Cloning done.")
+perlin_generator = PerlinGenerator()
 
 remove_clones()
-clone_cubes()
+create_clones_batch()
